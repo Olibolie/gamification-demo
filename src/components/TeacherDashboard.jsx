@@ -97,25 +97,33 @@ export default function TeacherDashboard() {
     setDifficulty('makkelijk');
   };
 
-  // Inzending goedkeuren
+  // Inzending goedkeuren (met volledige history logging)
   const handleApprove = async sub => {
-    const xpGain = xpConfig[sub.difficulty] || 0;
+    const xpGain     = xpConfig[sub.difficulty] || 0;
     const studentRef = doc(db, 'sessions', sessionCode, 'students', sub.studentId);
-    const studentSnap = await getDoc(studentRef);
-    const studentData = studentSnap.data() || {};
+    const studentSnap= await getDoc(studentRef);
+    const studentData= studentSnap.data() || {};
 
     // Bouw object met updates
     const updateFields = {
-      xp: (studentData.xp || 0) + xpGain,
+      xp:                   (studentData.xp || 0) + xpGain,
       assignmentsCompleted: (studentData.assignmentsCompleted || 0) + 1,
-      lastApprovedAt: serverTimestamp(),
-      currentAssignment: deleteField()
+      lastApprovedAt:       serverTimestamp(),
+      currentAssignment:    deleteField(),
+
+      // Volledige history entry
+      history: arrayUnion({
+        assignmentId: sub.assignmentId,
+        submittedAt:  sub.submittedAt,
+        approvedAt:   new Date()
+      })
     };
-    // Alleen toevoegen aan array als assignmentId bestaat
+    // keep completedAssignments array as well
     if (sub.assignmentId) {
       updateFields.completedAssignments = arrayUnion(sub.assignmentId);
     }
 
+    // Schrijf alle updates
     await updateDoc(studentRef, updateFields);
     await updateDoc(doc(db, 'sessions', sessionCode), { bossHp: bossHp - xpGain });
     await deleteDoc(doc(db, 'sessions', sessionCode, 'submissions', sub.id));
